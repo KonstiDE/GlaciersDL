@@ -15,8 +15,7 @@ from tqdm.auto import tqdm as prog
 from provider.dataset_provider import get_loader
 from utils.pytorchtools import EarlyStopping
 
-from torchmetrics.classification import BinaryAccuracy
-from torchmetrics.classification import BinaryF1Score
+from metrics.buffered_accuarcy import buffered_accuracy
 
 from config.configuration import (
     base_path,
@@ -29,10 +28,9 @@ from config.configuration import (
 )
 
 from model.unet_model import GlacierUNET
-from plotter.graphs import load_graphs_from_checkpoint
 
 
-def train(epoch, loader, loss_fn, optimizer, scaler, model, torch_acc, torch_f1):
+def train(epoch, loader, loss_fn, optimizer, scaler, model):
     torch.enable_grad()
     model.train()
 
@@ -41,7 +39,6 @@ def train(epoch, loader, loss_fn, optimizer, scaler, model, torch_acc, torch_f1)
     running_loss = []
 
     running_bacc = []
-    running_f1 = []
 
     for batch_index, (data, target) in enumerate(loop):
         optimizer.zero_grad(set_to_none=True)
@@ -65,16 +62,12 @@ def train(epoch, loader, loss_fn, optimizer, scaler, model, torch_acc, torch_f1)
         loop.set_postfix(info="Epoch {}, train, loss={:.5f}".format(epoch, loss_value))
         running_loss.append(loss_value)
 
-        running_bacc.append(torch_acc(data, target).item())
-        running_f1.append(torch_f1(data, target).item())
+        running_bacc.append(buffered_accuracy(data, target).item())
 
-        torch_acc.reset()
-        torch_f1.reset()
-
-    return s.mean(running_loss), s.mean(running_bacc), s.mean(running_f1)
+    return s.mean(running_loss), s.mean(running_bacc)
 
 
-def valid(epoch, loader, loss_fn, model, torch_bacc, torch_f1):
+def valid(epoch, loader, loss_fn, model):
     model.eval()
     torch.no_grad()
 
@@ -102,13 +95,9 @@ def valid(epoch, loader, loss_fn, model, torch_bacc, torch_f1):
         loop.set_postfix(info="Epoch {}, valid, loss={:.5f}".format(epoch, loss_value))
         running_loss.append(loss_value)
 
-        running_bacc.append(torch_bacc(data, target).item())
-        running_f1.append(torch_f1(data, target).item())
+        running_bacc.append(buffered_accuracy(data, target).item())
 
-        torch_bacc.reset()
-        torch_f1.reset()
-
-    return s.mean(running_loss), s.mean(running_bacc), s.mean(running_f1)
+    return s.mean(running_loss), s.mean(running_bacc)
 
 
 def run(num_epochs, lr, epoch_to_start_from):
@@ -120,9 +109,6 @@ def run(num_epochs, lr, epoch_to_start_from):
     scaler = torch.cuda.amp.GradScaler()
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
-    binary_accuracy = BinaryAccuracy().to(device)
-    binary_f1score = BinaryF1Score().to(device)
-
     epochs_done = 0
 
     overall_training_loss = []
@@ -130,8 +116,6 @@ def run(num_epochs, lr, epoch_to_start_from):
 
     overall_training_bacc = []
     overall_validation_bacc = []
-    overall_training_f1 = []
-    overall_validation_f1 = []
 
     path = "{}_{}_{}_{}_{}/".format(
         "results",
@@ -153,8 +137,6 @@ def run(num_epochs, lr, epoch_to_start_from):
         overall_validation_loss = checkpoint['validation_losses']
         overall_training_bacc = checkpoint['training_baccs']
         overall_validation_bacc = checkpoint['validation_baccs']
-        overall_training_f1 = checkpoint['training_f1s']
-        overall_validation_f1 = checkpoint['validation_f1s']
         early_stopping = checkpoint['early_stopping']
     else:
         if epoch_to_start_from == 0:
@@ -168,24 +150,20 @@ def run(num_epochs, lr, epoch_to_start_from):
     validation_loader = get_loader(os.path.join(base_path, valid_path_rel), batch_size, num_workers, pin_memory)
 
     for epoch in range(epochs_done + 1, num_epochs + 1):
-        training_loss, training_bacc, training_f1 = train(
+        training_loss, training_bacc = train(
             epoch,
             train_loader,
             loss_fn,
             optimizer,
             scaler,
-            model,
-            binary_accuracy,
-            binary_f1score
+            model
         )
 
-        validation_loss, validation_bacc, validation_f1 = valid(
+        validation_loss, validation_bacc = valid(
             epoch,
             validation_loader,
             loss_fn,
-            model,
-            binary_accuracy,
-            binary_f1score
+            model
         )
 
         overall_training_loss.append(training_loss)
@@ -193,9 +171,6 @@ def run(num_epochs, lr, epoch_to_start_from):
 
         overall_training_bacc.append(training_bacc)
         overall_validation_bacc.append(validation_bacc)
-
-        overall_training_f1.append(training_f1)
-        overall_validation_f1.append(validation_f1)
 
         early_stopping(validation_loss, model)
 
@@ -207,8 +182,6 @@ def run(num_epochs, lr, epoch_to_start_from):
             'validation_losses': overall_validation_loss,
             'training_baccs': overall_training_bacc,
             'validation_baccs': overall_validation_bacc,
-            'training_f1s': overall_training_f1,
-            'validation_f1s': overall_validation_f1,
             'early_stopping': early_stopping
         }, path + "model_epoch" + str(epoch) + ".pt")
 
@@ -218,9 +191,7 @@ def run(num_epochs, lr, epoch_to_start_from):
             overall_training_loss,
             overall_validation_loss,
             overall_training_bacc,
-            overall_validation_bacc,
-            overall_training_f1,
-            overall_validation_f1
+            overall_validation_bacc
         ], dtype='object')
 
         savetxt(path + "metrics.csv", metrics, delimiter=',',

@@ -23,8 +23,8 @@ class NrwDataSet(Dataset):
 
         self.dataset = []
 
-        files_data = os.listdir(os.path.join(data_dir, subs[0]))
-        files_masks = os.listdir(os.path.join(data_dir, subs[1]))
+        files_data = sorted(os.listdir(os.path.join(data_dir, subs[0])))
+        files_masks = sorted(os.listdir(os.path.join(data_dir, subs[1])))
 
         data_dir = data_dir
         self.dataset_paths = [(
@@ -69,8 +69,8 @@ def get_loader(npz_dir, batch_size, num_workers=2, pin_memory=True, shuffle=True
     return train_loader
 
 
-def get_dataset(npz_dir, percentage_load=0):
-    return NrwDataSet(npz_dir, percentage_load)
+def get_dataset(npz_dir):
+    return NrwDataSet(npz_dir)
 
 
 def slice_n_dice(data, mask, t):
