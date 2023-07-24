@@ -5,4 +5,4 @@ device = "cuda:0"
 batch_size = 8
 num_workers = 2
 pin_memory = True
-threshold = 0.6
+threshold = 0.7

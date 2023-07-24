@@ -25,7 +25,8 @@ from config.configuration import (
     device,
     batch_size,
     num_workers,
-    pin_memory
+    pin_memory,
+    threshold
 )
 
 from model.unet_model import GlacierUNET
@@ -56,6 +57,10 @@ def train(epoch, loader, loss_fn, optimizer, scaler, model):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+
+        data = torch.sigmoid(data)
+        data[data >= threshold] = 1
+        data[data < threshold] = 0
 
         loss_value = loss.item()
 
@@ -88,6 +93,10 @@ def valid(epoch, loader, loss_fn, model):
 
         with torch.no_grad():
             loss = loss_fn(data, target)
+
+        data = torch.sigmoid(data)
+        data[data >= threshold] = 1
+        data[data < threshold] = 0
 
         loss_value = loss.item()
 
