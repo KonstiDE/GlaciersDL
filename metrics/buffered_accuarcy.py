@@ -1,46 +1,63 @@
 import os.path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import rasterio as rio
+import torchvision.transforms.functional as tf
 
 import shutup
 
 from config.configuration import (
-    device,
     base_path
 )
 
-from PIL import Image
 
-
-def buffered_accuracy(pred, target, buffersize=4):
+def buffered_accuracy(pred, target, buffer_size=1):
     accs = []
 
     for i in range(pred.shape[0]):
         pred_raster = pred[i].squeeze(0)
         target_raster = target[i].squeeze(0)
 
+        plt.imshow(pred_raster.detach().cpu().numpy())
+        plt.show()
+
+        plt.imshow(target_raster.detach().cpu().numpy())
+        plt.show()
+
         line_positions = torch.argwhere(target_raster == 1)
 
-        buffer_positions = []
-        for tup in line_positions:
-            for i in range(1, buffersize + 1):
-                buffer_positions.extend(
-                    [
-                        torch.tensor([[tup[0] + i, tup[1]]]).to(device),
-                        torch.tensor([[tup[0] - i, tup[1]]]).to(device),
-                        torch.tensor([[tup[0], tup[1] + i]]).to(device),
-                        torch.tensor([[tup[0], tup[1] - i]]).to(device),
-                    ]
-                )
+        if buffer_size == 0:
+            pred_elements = pred_raster[line_positions[:, 0], line_positions[:, 1]]
+            target_elements = target_raster[line_positions[:, 0], line_positions[:, 1]]
 
-        for t in buffer_positions:
-            line_positions = torch.cat((line_positions, t))
+            return (torch.eq(pred_elements, target_elements).sum() / len(line_positions)).item()
 
-        pred_elements = pred_raster[line_positions[:, 0], line_positions[:, 1]]
-        target_elements = target_raster[line_positions[:, 0], line_positions[:, 1]]
+        hits = 0
+        pixels = 0
 
-        accs.append(torch.eq(pred_elements, target_elements).sum().float().mean().item())
+        done = set()
+
+        for pos in line_positions:
+            row, col = pos[0].item(), pos[1].item()
+
+            for i in range(-buffer_size, buffer_size + 1):
+                if (row + i, col) not in done:
+                    done.add((row + i, col))
+                    if 0 <= row + i < pred_raster.shape[0]:
+                        pixels += 1
+                        if torch.equal(pred_raster[row + i, col], target_raster[row + i, col]):
+                            hits += 1
+
+                if (row, col + i) not in done:
+                    done.add((row, col + i))
+                    if 0 <= col + i < pred_raster.shape[1]:
+                        pixels += 1
+                        if torch.equal(pred_raster[row, col + i], target_raster[row, col + i]):
+                            hits += 1
+
+        accs.append(hits / pixels)
 
     return sum(accs) / len(accs)
 
@@ -48,17 +65,20 @@ def buffered_accuracy(pred, target, buffersize=4):
 if __name__ == '__main__':
     shutup.please()
 
-    mask = Image.open(os.path.join(base_path, "data/validation/masks/Mapple_2018-03-07_S1_20_3_009_front.png"))
-    array = np.asarray(mask.getdata())
-    array = array.reshape((mask.width, mask.height))
+    mask = rio.open(os.path.join(base_path, "data/validation/masks/Mapple_2008-11-23_PALSAR_17_5_135_front.png")).read()
 
-    tensor = torch.tensor(array)
+    array = np.stack((mask, mask, mask, mask))
+
+    tensor = torch.tensor(array).cuda()
     tensor = torch.clip(tensor, 0, 1)
 
-    A = torch.ones((4, 1, mask.width, mask.height))
-    B = torch.zeros((4, 1, mask.width, mask.height))
+    B = torch.ones((4, 1, tensor.shape[2], tensor.shape[3])).cuda()
 
-    print(buffered_accuracy(pred=A, target=B))
+    print(B.shape)
+    print(tensor.shape)
+
+    pred_update = buffered_accuracy(pred=B, target=tensor)
+    print(pred_update)
 
 
 

@@ -10,7 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class NrwDataSet(Dataset):
-    def __init__(self, data_dir, subs=None, ):
+    def __init__(self, data_dir, load_amount, subs=None):
 
         if subs is None:
             subs = ["scenes", "masks"]
@@ -32,19 +32,27 @@ class NrwDataSet(Dataset):
             os.path.join(data_dir, subs[1], files_masks[i])
         ) for i in range(len(files_data))]
 
+        c = 0
         for path_tuple in self.dataset_paths:
             data = rio.open(path_tuple[0]).read().squeeze(0)
             mask = rio.open(path_tuple[1]).read().squeeze(0)
             mask[mask > 1] = 1
 
-            # transformed = transform(image=data, mask=mask)
+            #transformed = transform(image=data, mask=mask)
 
             tensor_slice_tuples = slice_n_dice(data, mask, t=256)
-
-            # transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"])
+            #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
 
             self.dataset.extend(check_integrity(tensor_slice_tuples))
-            # self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
+            #self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
+
+            c += 1
+            if load_amount > 0:
+                print(c)
+
+            if c == load_amount:
+                break
+
 
     def __len__(self):
         return len(self.dataset)
@@ -56,8 +64,8 @@ class NrwDataSet(Dataset):
             torch.Tensor(data_tuple[1]).unsqueeze(0)
 
 
-def get_loader(npz_dir, batch_size, num_workers=2, pin_memory=True, shuffle=True):
-    train_ds = NrwDataSet(npz_dir)
+def get_loader(npz_dir, batch_size, num_workers=2, pin_memory=True, shuffle=True, load_amount=0):
+    train_ds = NrwDataSet(npz_dir, load_amount)
 
     train_loader = DataLoader(
         train_ds,
@@ -69,8 +77,8 @@ def get_loader(npz_dir, batch_size, num_workers=2, pin_memory=True, shuffle=True
     return train_loader
 
 
-def get_dataset(npz_dir):
-    return NrwDataSet(npz_dir)
+def get_dataset(npz_dir, load_amount=0):
+    return NrwDataSet(npz_dir, load_amount)
 
 
 def slice_n_dice(data, mask, t):

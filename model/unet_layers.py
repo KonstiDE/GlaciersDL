@@ -1,7 +1,4 @@
-import torch
 import torch.nn as nn
-import torchvision.transforms.functional as tf
-import numpy as np
 
 
 class UpConv(nn.Module):

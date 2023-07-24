@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision.transforms.functional as tf
 
 from model.unet_layers import (
     DoubleConv, UpConv
@@ -54,7 +53,7 @@ class GlacierUNET(nn.Module):
 
 
 def test():
-    unet = UNET(in_channels=3, out_channels=1).cuda()
+    unet = GlacierUNET(in_channels=3, out_channels=1).cuda()
 
     x = torch.randn(1, 3, 512, 512).cuda()
 

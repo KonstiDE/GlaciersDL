@@ -7,6 +7,7 @@ import statistics as s
 import numpy as np
 
 import shutup
+
 shutup.please()
 
 from numpy import savetxt
@@ -24,7 +25,7 @@ from config.configuration import (
     device,
     batch_size,
     num_workers,
-    pin_memory,
+    pin_memory
 )
 
 from model.unet_model import GlacierUNET
@@ -38,7 +39,8 @@ def train(epoch, loader, loss_fn, optimizer, scaler, model):
 
     running_loss = []
 
-    running_bacc = []
+    running_bacc0 = []
+    running_bacc1 = []
 
     for batch_index, (data, target) in enumerate(loop):
         optimizer.zero_grad(set_to_none=True)
@@ -58,13 +60,12 @@ def train(epoch, loader, loss_fn, optimizer, scaler, model):
         loss_value = loss.item()
 
         running_loss.append(loss_value)
+        running_bacc0.append(buffered_accuracy(data, target, buffer_size=0))
+        running_bacc1.append(buffered_accuracy(data, target, buffer_size=1))
 
         loop.set_postfix(info="Epoch {}, train, loss={:.5f}".format(epoch, loss_value))
-        running_loss.append(loss_value)
 
-        running_bacc.append(buffered_accuracy(data, target).item())
-
-    return s.mean(running_loss), s.mean(running_bacc)
+    return s.mean(running_loss), s.mean(running_bacc0), s.mean(running_bacc1)
 
 
 def valid(epoch, loader, loss_fn, model):
@@ -75,8 +76,8 @@ def valid(epoch, loader, loss_fn, model):
 
     running_loss = []
 
-    running_bacc = []
-    running_f1 = []
+    running_bacc0 = []
+    running_bacc1 = []
 
     for batch_index, (data, target) in enumerate(loop):
         data = data.to(device)
@@ -91,13 +92,12 @@ def valid(epoch, loader, loss_fn, model):
         loss_value = loss.item()
 
         running_loss.append(loss_value)
+        running_bacc0.append(buffered_accuracy(data, target, buffer_size=0))
+        running_bacc1.append(buffered_accuracy(data, target, buffer_size=1))
 
         loop.set_postfix(info="Epoch {}, valid, loss={:.5f}".format(epoch, loss_value))
-        running_loss.append(loss_value)
 
-        running_bacc.append(buffered_accuracy(data, target).item())
-
-    return s.mean(running_loss), s.mean(running_bacc)
+    return s.mean(running_loss), s.mean(running_bacc0), s.mean(running_bacc1)
 
 
 def run(num_epochs, lr, epoch_to_start_from):
@@ -114,8 +114,10 @@ def run(num_epochs, lr, epoch_to_start_from):
     overall_training_loss = []
     overall_validation_loss = []
 
-    overall_training_bacc = []
-    overall_validation_bacc = []
+    overall_training_bacc0 = []
+    overall_training_bacc1 = []
+    overall_validation_bacc0 = []
+    overall_validation_bacc1 = []
 
     path = "{}_{}_{}_{}_{}/".format(
         "results",
@@ -135,8 +137,10 @@ def run(num_epochs, lr, epoch_to_start_from):
         epochs_done = checkpoint['epoch']
         overall_training_loss = checkpoint['training_losses']
         overall_validation_loss = checkpoint['validation_losses']
-        overall_training_bacc = checkpoint['training_baccs']
-        overall_validation_bacc = checkpoint['validation_baccs']
+        overall_training_bacc0 = checkpoint['training_baccs0']
+        overall_validation_bacc0 = checkpoint['validation_baccs0']
+        overall_training_bacc1 = checkpoint['training_baccs1']
+        overall_validation_bacc1 = checkpoint['validation_baccs1']
         early_stopping = checkpoint['early_stopping']
     else:
         if epoch_to_start_from == 0:
@@ -150,7 +154,7 @@ def run(num_epochs, lr, epoch_to_start_from):
     validation_loader = get_loader(os.path.join(base_path, valid_path_rel), batch_size, num_workers, pin_memory)
 
     for epoch in range(epochs_done + 1, num_epochs + 1):
-        training_loss, training_bacc = train(
+        training_loss, training_bacc0, training_bacc1 = train(
             epoch,
             train_loader,
             loss_fn,
@@ -159,7 +163,7 @@ def run(num_epochs, lr, epoch_to_start_from):
             model
         )
 
-        validation_loss, validation_bacc = valid(
+        validation_loss, validation_bacc0, validation_bacc1 = valid(
             epoch,
             validation_loader,
             loss_fn,
@@ -169,8 +173,10 @@ def run(num_epochs, lr, epoch_to_start_from):
         overall_training_loss.append(training_loss)
         overall_validation_loss.append(validation_loss)
 
-        overall_training_bacc.append(training_bacc)
-        overall_validation_bacc.append(validation_bacc)
+        overall_training_bacc0.append(training_bacc0)
+        overall_training_bacc1.append(training_bacc1)
+        overall_validation_bacc0.append(validation_bacc0)
+        overall_validation_bacc1.append(validation_bacc1)
 
         early_stopping(validation_loss, model)
 
@@ -180,8 +186,10 @@ def run(num_epochs, lr, epoch_to_start_from):
             'optimizer_state_dict': optimizer.state_dict(),
             'training_losses': overall_training_loss,
             'validation_losses': overall_validation_loss,
-            'training_baccs': overall_training_bacc,
-            'validation_baccs': overall_validation_bacc,
+            'training_baccs0': overall_training_bacc0,
+            'training_baccs1': overall_training_bacc1,
+            'validation_baccs0': overall_validation_bacc0,
+            'validation_baccs1': overall_validation_bacc1,
             'early_stopping': early_stopping
         }, path + "model_epoch" + str(epoch) + ".pt")
 
@@ -190,12 +198,14 @@ def run(num_epochs, lr, epoch_to_start_from):
         metrics = np.array([
             overall_training_loss,
             overall_validation_loss,
-            overall_training_bacc,
-            overall_validation_bacc
+            overall_training_bacc0,
+            overall_validation_bacc0,
+            overall_training_bacc1,
+            overall_validation_bacc1,
         ], dtype='object')
 
         savetxt(path + "metrics.csv", metrics, delimiter=',',
-                header="tloss,vloss,tbacc,vbacc,tf1,vf1", fmt='%s')
+                header="tloss,vloss,tbacc0,vbacc0,tbacc1,vbacc1", fmt='%s')
 
         if early_stopping.early_stop:
             print("Early stopping")
