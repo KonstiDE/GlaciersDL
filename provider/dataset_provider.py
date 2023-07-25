@@ -38,13 +38,13 @@ class NrwDataSet(Dataset):
             mask = rio.open(path_tuple[1]).read().squeeze(0)
             mask[mask > 1] = 1
 
-            #transformed = transform(image=data, mask=mask)
+            transformed = transform(image=data, mask=mask)
 
             tensor_slice_tuples = slice_n_dice(data, mask, t=256)
-            #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
+            transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
 
             self.dataset.extend(check_integrity(tensor_slice_tuples))
-            #self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
+            self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
 
             c += 1
             if load_amount > 0:

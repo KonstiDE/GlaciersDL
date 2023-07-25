@@ -1,10 +1,8 @@
 import os.path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import rasterio as rio
-import torchvision.transforms.functional as tf
 
 import shutup
 
@@ -20,19 +18,7 @@ def buffered_accuracy(pred, target, buffer_size=1):
         pred_raster = pred[i].squeeze(0)
         target_raster = target[i].squeeze(0)
 
-        plt.imshow(pred_raster.detach().cpu().numpy())
-        plt.show()
-
-        plt.imshow(target_raster.detach().cpu().numpy())
-        plt.show()
-
         line_positions = torch.argwhere(target_raster == 1)
-
-        if buffer_size == 0:
-            pred_elements = pred_raster[line_positions[:, 0], line_positions[:, 1]]
-            target_elements = target_raster[line_positions[:, 0], line_positions[:, 1]]
-
-            return (torch.eq(pred_elements, target_elements).sum() / len(line_positions)).item()
 
         hits = 0
         pixels = 0
@@ -77,7 +63,7 @@ if __name__ == '__main__':
     print(B.shape)
     print(tensor.shape)
 
-    pred_update = buffered_accuracy(pred=B, target=tensor)
+    pred_update = buffered_accuracy(pred=B, target=tensor, buffer_size=0)
     print(pred_update)
 
 

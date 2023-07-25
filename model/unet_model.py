@@ -53,7 +53,7 @@ class GlacierUNET(nn.Module):
 
 
 def test():
-    unet = GlacierUNET(in_channels=3, out_channels=1).cuda()
+    unet = GlacierUNET(in_channels=1, out_channels=1).cuda()
 
     x = torch.randn(1, 3, 512, 512).cuda()
 

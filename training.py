@@ -222,4 +222,4 @@ def run(num_epochs, lr, epoch_to_start_from):
 
 
 if __name__ == '__main__':
-    run(100, lr=5e-06, epoch_to_start_from=0)
+    run(100, lr=4e-05, epoch_to_start_from=0)
