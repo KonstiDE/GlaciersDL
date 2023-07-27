@@ -1,5 +1,7 @@
 import os
 import random
+
+import matplotlib.pyplot as plt
 import torch
 
 import numpy as np
@@ -36,15 +38,15 @@ class NrwDataSet(Dataset):
         for path_tuple in self.dataset_paths:
             data = rio.open(path_tuple[0]).read().squeeze(0)
             mask = rio.open(path_tuple[1]).read().squeeze(0)
-            mask[mask > 1] = 1
+            mask[mask == 255] = 1
 
-            transformed = transform(image=data, mask=mask)
+            #transformed = transform(image=data, mask=mask)
 
-            tensor_slice_tuples = slice_n_dice(data, mask, t=256)
-            transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
+            tensor_slice_tuples = slice_n_dice(data, mask, t=512)
+            #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
 
             self.dataset.extend(check_integrity(tensor_slice_tuples))
-            self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
+            #self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
 
             c += 1
             if load_amount > 0:
@@ -52,7 +54,6 @@ class NrwDataSet(Dataset):
 
             if c == load_amount:
                 break
-
 
     def __len__(self):
         return len(self.dataset)
@@ -66,7 +67,6 @@ class NrwDataSet(Dataset):
 
 def get_loader(npz_dir, batch_size, num_workers=2, pin_memory=True, shuffle=True, load_amount=0):
     train_ds = NrwDataSet(npz_dir, load_amount)
-
     train_loader = DataLoader(
         train_ds,
         batch_size=batch_size,
@@ -97,7 +97,7 @@ def slice_n_dice(data, mask, t):
                 padded_mask = np.zeros((t, t))
                 padded_data[:tile_data.shape[0], :tile_data.shape[1]] = tile_data
                 padded_mask[:tile_mask.shape[0], :tile_mask.shape[1]] = tile_mask
-                slices.append((torch.Tensor(padded_data), torch.Tensor(padded_mask)))
+                slices.append((padded_data, padded_mask))
             else:
                 slices.append((tile_data, tile_mask))
 
@@ -105,7 +105,14 @@ def slice_n_dice(data, mask, t):
 
 
 def check_integrity(data_mask_pairs):
-    return [dm_pair for dm_pair in data_mask_pairs if len(np.unique(dm_pair[1])) > 1]
+
+    valid_pairs = []
+
+    for dm_pair in data_mask_pairs:
+        if len(np.unique(dm_pair[1])) > 1:
+            valid_pairs.append(dm_pair)
+
+    return valid_pairs
 
 
 if __name__ == '__main__':
