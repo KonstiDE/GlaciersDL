@@ -41,11 +41,11 @@ class NrwDataSet(Dataset):
             data = rio.open(path_tuple[0]).read().squeeze(0)
             mask = rio.open(path_tuple[1]).read().squeeze(0)
             mask[mask == 255] = 1
-            mask = thicken_front(mask, thickness=10)
+            mask = thicken_front(mask, thickness=8)
 
             #transformed = transform(image=data, mask=mask)
 
-            tensor_slice_tuples = slice_n_dice(data, mask, t=512)
+            tensor_slice_tuples = slice_n_dice(data, mask, t=256)
             #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=512)
 
             self.dataset.extend(check_integrity(tensor_slice_tuples))

@@ -1,4 +1,7 @@
 import os
+from functools import partial
+
+import ray
 import torch
 import torch.nn as nn
 
@@ -21,16 +24,19 @@ from config.configuration import (
     train_path_rel,
     valid_path_rel,
     device,
-    batch_size,
     num_workers,
     pin_memory,
-    lr,
-    threshold
+    batch_size
 )
 
 from model.unet_model import GlacierUNET
 
 from segmentation_models_pytorch.losses.dice import DiceLoss
+
+from ray import tune
+from ray.air import Checkpoint, session
+from ray.tune.schedulers import ASHAScheduler
+
 
 
 def train(epoch, loader, loss_fn, optimizer, scaler, model):
@@ -47,7 +53,7 @@ def train(epoch, loader, loss_fn, optimizer, scaler, model):
 
         data = model(data)
 
-        target = target.to(device).squeeze(1)
+        target = target.to(device)
 
         with torch.cuda.amp.autocast():
             loss = loss_fn(data, target)
@@ -78,7 +84,7 @@ def valid(epoch, loader, loss_fn, model):
 
         data = model(data)
 
-        target = target.to(device).squeeze(1)
+        target = target.to(device)
 
         with torch.no_grad():
             loss = loss_fn(data, target)
@@ -92,22 +98,16 @@ def valid(epoch, loader, loss_fn, model):
     return s.mean(running_loss)
 
 
-def run(num_epochs, epoch_to_start_from):
+def run(config):
     torch.cuda.empty_cache()
 
-    weights = [
-        0.98, 0.02
-    ]
+    model = GlacierUNET().to(device)
+    model = nn.DataParallel(model)
 
-    normedWeights = torch.FloatTensor([1 - (x / sum(weights)) for x in weights]).to(device)
-
-    model = GlacierUNET(in_channels=1, out_channels=2).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=2e-04)
-    loss_fn = nn.CrossEntropyLoss(weight=normedWeights)
+    optimizer = optim.Adam(model.parameters(), lr=config["lr"])
+    loss_fn = DiceLoss(mode="binary")
     scaler = torch.cuda.amp.GradScaler()
     early_stopping = EarlyStopping(patience=5, verbose=True)
-
-    epochs_done = 0
 
     overall_training_loss = []
     overall_validation_loss = []
@@ -115,39 +115,32 @@ def run(num_epochs, epoch_to_start_from):
     overall_training_acc = []
     overall_validation_acc = []
 
-    path = "{}_{}_{}_{}_{}/".format(
+    path = "{}_{}_{}_{}/".format(
         "results",
         str(loss_fn.__class__.__name__),
         str(optimizer.__class__.__name__),
-        str(GlacierUNET.__qualname__),
-        lr
+        str(GlacierUNET.__qualname__)
     )
 
     if not os.path.isdir(path):
         os.mkdir(path)
 
-    if os.path.isfile(path + "model_epoch" + str(epoch_to_start_from) + ".pt") and epoch_to_start_from > 0:
-        checkpoint = torch.load(path + "model_epoch" + str(epoch_to_start_from) + ".pt", map_location='cpu')
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        epochs_done = checkpoint['epoch']
-        overall_training_loss = checkpoint['training_losses']
-        overall_validation_loss = checkpoint['validation_losses']
-        overall_training_acc = checkpoint['training_accs']
-        overall_validation_acc = checkpoint['validation_accs']
-        early_stopping = checkpoint['early_stopping']
+    checkpoint = session.get_checkpoint()
+
+    if checkpoint:
+        checkpoint_state = checkpoint.to_dict()
+        start_epoch = checkpoint_state["epoch"]
+        model.load_state_dict(checkpoint_state["net_state_dict"])
+        optimizer.load_state_dict(checkpoint_state["optimizer_state_dict"])
     else:
-        if epoch_to_start_from == 0:
-            model.to(device)
-        else:
-            raise Exception("No model_epoch" + str(epoch_to_start_from) + ".pt found")
+        start_epoch = 0
 
     model.to(device)
 
-    train_loader = get_loader(os.path.join(base_path, train_path_rel), batch_size, num_workers, pin_memory)
-    validation_loader = get_loader(os.path.join(base_path, valid_path_rel), batch_size, num_workers, pin_memory)
+    train_loader = get_loader(os.path.join(base_path, train_path_rel), config["batch_size"], num_workers, pin_memory)
+    validation_loader = get_loader(os.path.join(base_path, valid_path_rel), config["batch_size"], num_workers, pin_memory)
 
-    for epoch in range(epochs_done + 1, num_epochs + 1):
+    for epoch in range(start_epoch, 100):
         training_loss = train(
             epoch,
             train_loader,
@@ -169,16 +162,17 @@ def run(num_epochs, epoch_to_start_from):
 
         early_stopping(validation_loss, model)
 
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': model.cpu().state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'training_losses': overall_training_loss,
-            'validation_losses': overall_validation_loss,
-            'training_accs': overall_training_acc,
-            'validation_accs': overall_validation_acc,
-            'early_stopping': early_stopping
-        }, path + "model_epoch" + str(epoch) + ".pt")
+        checkpoint_data = {
+            "epoch": epoch,
+            "net_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+        }
+        checkpoint = Checkpoint.from_dict(checkpoint_data)
+
+        session.report(
+            {"loss": validation_loss},
+            checkpoint=checkpoint,
+        )
 
         model.to(device)
 
@@ -198,4 +192,32 @@ def run(num_epochs, epoch_to_start_from):
 
 
 if __name__ == '__main__':
-    run(100, epoch_to_start_from=0)
+    config_space = {
+        "lr": tune.loguniform(1e-1, 1e-6),
+        "batch_size": tune.choice([4, 8, 16])
+    }
+    scheduler = ASHAScheduler(
+        metric="loss",
+        mode="min",
+        max_t=100,
+        grace_period=1,
+        reduction_factor=2,
+    )
+    result = tune.run(
+        partial(run),
+        config=config_space,
+        scheduler=scheduler,
+        num_samples=50,
+        resources_per_trial={
+            "gpu": 0.25
+        }
+    )
+
+    best_trial = result.get_best_trial("loss", "min", "last")
+    print(f"Best trial config: {best_trial.config}")
+    print(f"Best trial final validation loss: {best_trial.last_result['loss']}")
+    print(f"Best trial final validation accuracy: {best_trial.last_result['accuracy']}")
+
+    best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
+    best_checkpoint_data = best_checkpoint.to_dict()
+

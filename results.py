@@ -23,7 +23,7 @@ from PIL import Image
 
 
 def generate_result(model):
-    target_range = 512
+    target_range = 256
 
     image = rio.open(os.path.join(
         base_path,
@@ -70,10 +70,11 @@ def generate_result(model):
 
 if __name__ == '__main__':
     glacier_model = GlacierUNET(in_channels=1, out_channels=1)
+    glacier_model.eval()
 
     glacier_state_dict = torch.load(os.path.join(
         base_path,
-        "results_BCEWithLogitsLoss_DiceLoss_Adam_GlacierUNET_1e-05/model_epoch6.pt"
+        "results_DiceLoss_Adam_GlacierUNET_0.0001/model_epoch10.pt"
     ))["model_state_dict"]
 
     glacier_model.load_state_dict(glacier_state_dict)
