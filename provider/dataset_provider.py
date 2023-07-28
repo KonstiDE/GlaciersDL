@@ -8,6 +8,8 @@ import numpy as np
 import rasterio as rio
 import albumentations as A
 
+from provider.front_provider import thicken_front
+
 from torch.utils.data import Dataset, DataLoader
 
 
@@ -39,11 +41,12 @@ class NrwDataSet(Dataset):
             data = rio.open(path_tuple[0]).read().squeeze(0)
             mask = rio.open(path_tuple[1]).read().squeeze(0)
             mask[mask == 255] = 1
+            mask = thicken_front(mask, thickness=10)
 
             #transformed = transform(image=data, mask=mask)
 
             tensor_slice_tuples = slice_n_dice(data, mask, t=512)
-            #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
+            #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=512)
 
             self.dataset.extend(check_integrity(tensor_slice_tuples))
             #self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
@@ -62,7 +65,7 @@ class NrwDataSet(Dataset):
         data_tuple = self.dataset[index]
 
         return torch.Tensor(data_tuple[0]).unsqueeze(0), \
-            torch.Tensor(data_tuple[1]).unsqueeze(0)
+            torch.LongTensor(data_tuple[1]).unsqueeze(0)
 
 
 def get_loader(npz_dir, batch_size, num_workers=2, pin_memory=True, shuffle=True, load_amount=0):

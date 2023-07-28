@@ -10,21 +10,20 @@ import shutup
 shutup.please()
 
 from config.configuration import (
-    base_path,
-    device,
-    threshold
+    base_path
 )
 
 from provider.dataset_provider import (
     slice_n_dice
 )
 from model.unet_model import GlacierUNET
+from provider.front_provider import thicken_front
 
 from PIL import Image
 
 
 def generate_result(model):
-    target_range = 256
+    target_range = 512
 
     image = rio.open(os.path.join(
         base_path,
@@ -32,16 +31,16 @@ def generate_result(model):
     )).read().squeeze(0)
     mask = rio.open(os.path.join(
         base_path,
-        "data/test/masks/Crane_2002-11-18_ERS_20_3_195_zones.png"
+        "data/test/masks/Crane_2002-11-18_ERS_20_3_195_front.png"
     )).read().squeeze(0)
-    mask[mask != 127] = 0
-    mask[mask == 127] = 1
+    mask[mask == 255] = 1
+    mask = thicken_front(mask, thickness=10)
 
     plt.imshow(mask)
     plt.show()
 
-    mosaic_width_index = (image.shape[0] // 256) + 1
-    mosaic_height_index = (image.shape[1] // 256) + 1
+    mosaic_width_index = (image.shape[0] // target_range) + 1
+    mosaic_height_index = (image.shape[1] // target_range) + 1
 
     tuples = slice_n_dice(image, mask, t=target_range)
 
@@ -54,8 +53,6 @@ def generate_result(model):
 
         data = model(data)
 
-        data = torch.round(data)
-
         if cw == mosaic_height_index:
             ch += 1
             cw = 0
@@ -67,6 +64,7 @@ def generate_result(model):
         cw += 1
 
     plt.imshow(result_image)
+    plt.colorbar()
     plt.show()
 
 
@@ -75,7 +73,7 @@ if __name__ == '__main__':
 
     glacier_state_dict = torch.load(os.path.join(
         base_path,
-        "results_L1Loss_Adam_GlacierUNET_5e-06/model_epoch11.pt"
+        "results_BCEWithLogitsLoss_DiceLoss_Adam_GlacierUNET_1e-05/model_epoch6.pt"
     ))["model_state_dict"]
 
     glacier_model.load_state_dict(glacier_state_dict)

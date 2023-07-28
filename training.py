@@ -1,7 +1,7 @@
 import os
 import torch
-
 import torch.nn as nn
+
 import torch.optim as optim
 import statistics as s
 import numpy as np
@@ -12,8 +12,6 @@ shutup.please()
 
 from numpy import savetxt
 from tqdm.auto import tqdm as prog
-
-from metrics.buffered_accuarcy import buffered_accuracy
 
 from provider.dataset_provider import get_loader
 from utils.pytorchtools import EarlyStopping
@@ -26,8 +24,8 @@ from config.configuration import (
     batch_size,
     num_workers,
     pin_memory,
-    threshold,
-    lr
+    lr,
+    threshold
 )
 
 from model.unet_model import GlacierUNET
@@ -35,7 +33,7 @@ from model.unet_model import GlacierUNET
 from segmentation_models_pytorch.losses.dice import DiceLoss
 
 
-def train(epoch, loader, loss_fn1, loss_fn2, optimizer, scaler, model):
+def train(epoch, loader, loss_fn, optimizer, scaler, model):
     torch.enable_grad()
     model.train()
 
@@ -49,10 +47,10 @@ def train(epoch, loader, loss_fn1, loss_fn2, optimizer, scaler, model):
 
         data = model(data)
 
-        target = target.to(device)
+        target = target.to(device).squeeze(1)
 
         with torch.cuda.amp.autocast():
-            loss = loss_fn1(data, target)
+            loss = loss_fn(data, target)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -67,7 +65,7 @@ def train(epoch, loader, loss_fn1, loss_fn2, optimizer, scaler, model):
     return s.mean(running_loss)
 
 
-def valid(epoch, loader, loss_fn1, loss_fn2, model):
+def valid(epoch, loader, loss_fn, model):
     model.eval()
     torch.no_grad()
 
@@ -80,10 +78,10 @@ def valid(epoch, loader, loss_fn1, loss_fn2, model):
 
         data = model(data)
 
-        target = target.to(device)
+        target = target.to(device).squeeze(1)
 
         with torch.no_grad():
-            loss = loss_fn1(data, target)
+            loss = loss_fn(data, target)
 
         loss_value = loss.item()
 
@@ -97,10 +95,15 @@ def valid(epoch, loader, loss_fn1, loss_fn2, model):
 def run(num_epochs, epoch_to_start_from):
     torch.cuda.empty_cache()
 
-    model = GlacierUNET(in_channels=1, out_channels=1).to(device)
+    weights = [
+        0.98, 0.02
+    ]
+
+    normedWeights = torch.FloatTensor([1 - (x / sum(weights)) for x in weights]).to(device)
+
+    model = GlacierUNET(in_channels=1, out_channels=2).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=2e-04)
-    loss_fn1 = nn.BCEWithLogitsLoss()
-    loss_fn2 = DiceLoss("multiclass")
+    loss_fn = nn.CrossEntropyLoss(weight=normedWeights)
     scaler = torch.cuda.amp.GradScaler()
     early_stopping = EarlyStopping(patience=5, verbose=True)
 
@@ -112,10 +115,9 @@ def run(num_epochs, epoch_to_start_from):
     overall_training_acc = []
     overall_validation_acc = []
 
-    path = "{}_{}_{}_{}_{}_{}/".format(
+    path = "{}_{}_{}_{}_{}/".format(
         "results",
-        str(loss_fn1.__class__.__name__),
-        str(loss_fn2.__class__.__name__),
+        str(loss_fn.__class__.__name__),
         str(optimizer.__class__.__name__),
         str(GlacierUNET.__qualname__),
         lr
@@ -149,7 +151,7 @@ def run(num_epochs, epoch_to_start_from):
         training_loss = train(
             epoch,
             train_loader,
-            loss_fn1, loss_fn2,
+            loss_fn,
             optimizer,
             scaler,
             model
@@ -158,7 +160,7 @@ def run(num_epochs, epoch_to_start_from):
         validation_loss = valid(
             epoch,
             validation_loader,
-            loss_fn1, loss_fn2,
+            loss_fn,
             model
         )
 

@@ -11,7 +11,7 @@ class GlacierUNET(nn.Module):
         super(GlacierUNET, self).__init__()
 
         if features is None:
-            features = [in_channels, 64, 128, 256, 512, 1024]
+            features = [in_channels, 64, 128, 256, 512]
 
         self.down_convs = nn.ModuleList()
         self.up_convs = nn.ModuleList()
@@ -19,7 +19,6 @@ class GlacierUNET(nn.Module):
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
         self.final = nn.Conv2d(features[1], out_channels, kernel_size=(1, 1))
-        self.sigmoid = nn.Sigmoid()
 
         for i in range(len(features) - 2):
             self.down_convs.append(DoubleConv(features[i], features[i + 1]))
@@ -50,9 +49,7 @@ class GlacierUNET(nn.Module):
             x = torch.cat((x, skip_connections[i]), dim=1)
             x = self.up_convs[i](x)
 
-        x = self.final(x)
-
-        return self.sigmoid(x)
+        return self.final(x)
 
 
 def test():
