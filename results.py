@@ -2,6 +2,11 @@ import os
 
 import matplotlib.pyplot as plt
 import torch
+import torch.nn as nn
+
+from pathlib import Path
+from typing import List, Optional, Dict, Union, Callable
+from ray import cloudpickle
 
 import rasterio as rio
 import numpy as np
@@ -23,7 +28,7 @@ from PIL import Image
 
 
 def generate_result(model):
-    target_range = 256
+    target_range = 512
 
     image = rio.open(os.path.join(
         base_path,
@@ -52,6 +57,7 @@ def generate_result(model):
         data = torch.Tensor(data).unsqueeze(0).unsqueeze(0)
 
         data = model(data)
+        data = torch.sigmoid(data)
 
         if cw == mosaic_height_index:
             ch += 1
@@ -63,20 +69,31 @@ def generate_result(model):
 
         cw += 1
 
+    result_image = result_image.crop(Image.fromarray(image).getbbox())
     plt.imshow(result_image)
+
     plt.colorbar()
     plt.show()
 
 
+def load_checkpoint_from_path(checkpoint_to_load: Union[str, Path]) -> Dict:
+    checkpoint_path = Path(checkpoint_to_load).expanduser()
+    if not checkpoint_path.exists():
+        raise ValueError(f"Checkpoint path {checkpoint_path} does not exist.")
+    with checkpoint_path.open("rb") as f:
+        return cloudpickle.load(f)
+
+
 if __name__ == '__main__':
-    glacier_model = GlacierUNET(in_channels=1, out_channels=1)
+    glacier_model = GlacierUNET()
     glacier_model.eval()
 
     glacier_state_dict = torch.load(os.path.join(
         base_path,
-        "results_DiceLoss_Adam_GlacierUNET_0.0001/model_epoch10.pt"
+        "results_DiceLoss_Adam_GlacierUNET/model_epoch8.pt"
     ))["model_state_dict"]
-
     glacier_model.load_state_dict(glacier_state_dict)
 
     generate_result(model=glacier_model)
+
+

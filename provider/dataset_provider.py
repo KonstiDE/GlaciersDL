@@ -1,7 +1,6 @@
 import os
 import random
 
-import matplotlib.pyplot as plt
 import torch
 
 import numpy as np
@@ -11,6 +10,11 @@ import albumentations as A
 from provider.front_provider import thicken_front
 
 from torch.utils.data import Dataset, DataLoader
+
+import imgaug
+imgaug.iarandom.seed(251199)
+random.seed(251199)
+
 
 
 class NrwDataSet(Dataset):
@@ -30,7 +34,6 @@ class NrwDataSet(Dataset):
         files_data = sorted(os.listdir(os.path.join(data_dir, subs[0])))
         files_masks = sorted(os.listdir(os.path.join(data_dir, subs[1])))
 
-        data_dir = data_dir
         self.dataset_paths = [(
             os.path.join(data_dir, subs[0], files_data[i]),
             os.path.join(data_dir, subs[1], files_masks[i])
@@ -41,15 +44,15 @@ class NrwDataSet(Dataset):
             data = rio.open(path_tuple[0]).read().squeeze(0)
             mask = rio.open(path_tuple[1]).read().squeeze(0)
             mask[mask == 255] = 1
-            mask = thicken_front(mask, thickness=8)
+            mask = thicken_front(mask, thickness=5)
 
-            #transformed = transform(image=data, mask=mask)
+            transformed = transform(image=data, mask=mask)
 
             tensor_slice_tuples = slice_n_dice(data, mask, t=256)
-            #transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=512)
+            transformed_tensor_slice_tuples = slice_n_dice(transformed["image"], transformed["mask"], t=256)
 
             self.dataset.extend(check_integrity(tensor_slice_tuples))
-            #self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
+            self.dataset.extend(check_integrity(transformed_tensor_slice_tuples))
 
             c += 1
             if load_amount > 0:
