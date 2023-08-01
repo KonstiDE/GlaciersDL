@@ -32,7 +32,7 @@ from config.configuration import (
     lr
 )
 
-from model.unet_model import GlacierUNET
+from model.glacier_model import GlacierUNET
 
 from segmentation_models_pytorch.losses.dice import DiceLoss
 
@@ -255,7 +255,7 @@ def start():
         run({})
 
 
-ray_tune = True
+ray_tune = False
 
 if __name__ == '__main__':
     start()

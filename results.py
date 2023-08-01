@@ -21,7 +21,7 @@ from config.configuration import (
 from provider.dataset_provider import (
     slice_n_dice
 )
-from model.unet_model import GlacierUNET
+from model.glacier_model import GlacierUNET
 from provider.front_provider import thicken_front
 
 from PIL import Image

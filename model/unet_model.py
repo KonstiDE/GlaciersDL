@@ -1,114 +1,66 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from model.ASPP import ASPP
+
+from model.unet_layers import (
+    DoubleConv, UpConv
+)
 
 
 class GlacierUNET(nn.Module):
-
-    def __init__(self):
+    def __init__(self, in_channels=3, out_channels=1, features=None):
         super(GlacierUNET, self).__init__()
 
-        self.n_channels_of_input = 1  # Greyscale
-        self.kernel_size = 3
-        self.non_linearity = "Leaky_ReLU"
-        self.n_layers = 5
-        self.features_start = 32
-        self.aspp = True
+        if features is None:
+            features = [in_channels, 64, 128, 256, 512, 1024]
 
-        self.layers, self.bottleneck = self.make_layer_structure()
+        self.down_convs = nn.ModuleList()
+        self.up_convs = nn.ModuleList()
+        self.up_trans = nn.ModuleList()
+        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
 
-    def make_layer_structure(self):
-        layers = [DoubleConv(in_channels=self.n_channels_of_input, out_channels=self.features_start,
-                             kernel_size=self.kernel_size, non_linearity=self.non_linearity)]
+        self.final = nn.Conv2d(features[1], out_channels, kernel_size=(1, 1))
 
-        feats = self.features_start
-        for _ in range(self.n_layers - 1):
-            layers.append(Down(in_channels=feats, out_channels=feats * 2, kernel_size=self.kernel_size,
-                               non_linearity=self.non_linearity))
-            feats *= 2
+        for i in range(len(features) - 2):
+            self.down_convs.append(DoubleConv(features[i], features[i + 1]))
 
-        if self.aspp:
-            bottleneck = ASPP(feats, [1, 2, 4, 8], feats)
-        else:
-            bottleneck = None
+        self.bottleneck = DoubleConv(features[-2], features[-1])
 
-        for _ in range(self.n_layers - 1):
-            layers.append(Up(in_channels=feats, out_channels=feats // 2, kernel_size=self.kernel_size, non_linearity=self.non_linearity))
-            feats //= 2
+        features = features[::-1]
 
-        layers.append(nn.Conv2d(feats, 1, kernel_size=1))
-        return nn.ModuleList(layers), bottleneck
+        for i in range(len(features) - 2):
+            self.up_convs.append(DoubleConv(features[i], features[i + 1]))
+            self.up_trans.append(UpConv(features[i], features[i + 1]))
 
     def forward(self, x):
-        xi = [self.layers[0](x)]
-        # Down path
-        for layer in self.layers[1:self.n_layers]:
-            xi.append(layer(xi[-1]))
+        skip_connections = []
 
-        # Bottleneck layers
-        if self.bottleneck is not None:
-            xi[-1] = self.bottleneck(xi[-1])
+        for down_conv in self.down_convs:
+            x = down_conv(x)
+            skip_connections.append(x)
+            x = self.pool(x)
 
-        # Up path
-        for i, layer in enumerate(self.layers[self.n_layers:-1]):
-            xi[-1] = layer(xi[-1], xi[-2 - i])
-        return self.layers[-1](xi[-1])
+        x = self.bottleneck(x)
 
+        skip_connections = skip_connections[::-1]
 
+        for i in range(len(self.up_convs)):
+            x = self.up_trans[i](x)
 
-class DoubleConv(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, non_linearity: str):
-        super().__init__()
-        if non_linearity == "ReLU":
-            self.net = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size//2), nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True),
-                nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=kernel_size//2), nn.BatchNorm2d(out_channels), nn.ReLU(inplace=True)
-            )
-        else:
-            self.net = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size//2), nn.BatchNorm2d(out_channels), nn.LeakyReLU(negative_slope=0.1, inplace=True),
-                nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, padding=kernel_size//2), nn.BatchNorm2d(out_channels), nn.LeakyReLU(negative_slope=0.1, inplace=True)
-            )
+            x = torch.cat((x, skip_connections[i]), dim=1)
+            x = self.up_convs[i](x)
 
-    def forward(self, x):
-        return self.net(x)
+        return self.final(x)
 
 
-class Down(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, non_linearity: str):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            DoubleConv(in_channels=in_channels, out_channels=out_channels,
-                       kernel_size=kernel_size, non_linearity=non_linearity)
-        )
+def test():
+    unet = GlacierUNET(in_channels=1, out_channels=1).cuda()
 
-    def forward(self, x):
-        return self.net(x)
+    x = torch.randn(1, 3, 512, 512).cuda()
+
+    out = unet(x)
+
+    print(out.shape)
 
 
-class Up(nn.Module):
-    def __init__(self,
-                 in_channels: int,
-                 out_channels: int,
-                 kernel_size: int,
-                 non_linearity: str):
-
-        super().__init__()
-        self.upsample = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-
-        self.conv = DoubleConv(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, non_linearity=non_linearity)
-
-    def forward(self, x1, x2):
-        x1 = self.upsample(x1)
-
-        # Pad x1 to the size of x2
-        diff_h = x2.shape[2] - x1.shape[2]
-        diff_w = x2.shape[3] - x1.shape[3]
-
-        x1 = F.pad(x1, [diff_w // 2, diff_w - diff_w // 2, diff_h // 2, diff_h - diff_h // 2])
-
-        # Concatenate along the channels axis
-        x = torch.cat([x2, x1], dim=1)
-        return self.conv(x)
+if __name__ == "__main__":
+    test()
