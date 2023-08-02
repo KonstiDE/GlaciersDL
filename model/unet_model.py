@@ -7,7 +7,7 @@ from model.unet_layers import (
 
 
 class GlacierUNET(nn.Module):
-    def __init__(self, in_channels=3, out_channels=1, features=None):
+    def __init__(self, in_channels=1, out_channels=1, features=None):
         super(GlacierUNET, self).__init__()
 
         if features is None:
@@ -55,7 +55,7 @@ class GlacierUNET(nn.Module):
 def test():
     unet = GlacierUNET(in_channels=1, out_channels=1).cuda()
 
-    x = torch.randn(1, 3, 512, 512).cuda()
+    x = torch.randn(1, 1, 512, 512).cuda()
 
     out = unet(x)
 

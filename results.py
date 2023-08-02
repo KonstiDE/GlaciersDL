@@ -21,7 +21,7 @@ from config.configuration import (
 from provider.dataset_provider import (
     slice_n_dice
 )
-from model.glacier_model import GlacierUNET
+from model.unet_model import GlacierUNET
 from provider.front_provider import thicken_front
 
 from PIL import Image
@@ -85,12 +85,12 @@ def load_checkpoint_from_path(checkpoint_to_load: Union[str, Path]) -> Dict:
 
 
 if __name__ == '__main__':
-    glacier_model = GlacierUNET()
+    glacier_model = GlacierUNET(in_channels=1, out_channels=1)
     glacier_model.eval()
 
     glacier_state_dict = torch.load(os.path.join(
         base_path,
-        "results_DiceLoss_Adam_GlacierUNET/model_epoch8.pt"
+        "results_DiceLoss_Adam_GlacierUNET_very_spare/model_epoch16.pt"
     ))["model_state_dict"]
     glacier_model.load_state_dict(glacier_state_dict)
 
