@@ -1,18 +1,10 @@
 import os
-
-import matplotlib.pyplot as plt
 import torch
-import torch.nn as nn
-
-from pathlib import Path
-from typing import List, Optional, Dict, Union, Callable
-from ray import cloudpickle
 
 import rasterio as rio
 import numpy as np
 
 import shutup
-from scipy import ndimage
 from skimage.morphology import skeletonize
 
 shutup.please()
@@ -90,18 +82,6 @@ def generate_result(model, path, subs=None):
         img.save(os.path.join(base_path, "results", scene_file + "_pred.png"))
 
         print("Finished " + scene_file + " (" + str((index / (len(scenes) - 1)) * 100) + "%)")
-
-
-def find_longest_line_of_ones(matrix):
-    matrix = np.array(matrix)
-    labeled, num_features = ndimage.label(matrix)
-    if num_features == 0:
-        return matrix
-
-    sizes = ndimage.sum(matrix, labeled, range(num_features + 1))
-    max_size_label = np.argmax(sizes[1:]) + 1
-    matrix[labeled != max_size_label] = 0
-    return matrix
 
 
 def skeletonize_longest_line(matrix):

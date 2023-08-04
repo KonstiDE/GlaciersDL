@@ -1,11 +1,7 @@
 import os
 
-import matplotlib.pyplot as plt
-
 import rasterio as rio
 import numpy as np
-
-import cv2
 
 import shutup
 from rasterio.transform import from_origin
@@ -15,28 +11,6 @@ shutup.please()
 from config.configuration import (
     base_path
 )
-
-from PIL import Image
-
-
-def create_color_gradient(n_classes):
-    cmap = plt.get_cmap('jet')  # You can choose different colormaps
-    colors = [cmap(i) for i in np.linspace(0, 1, n_classes)]
-    return colors
-
-
-def colorize_masks_stacked(stacked_masks, colors):
-    h, w, n_layers = stacked_masks.shape
-    colored_stack = np.zeros((h, w, 3), dtype=np.uint8)
-
-    colors = (np.array(colors)[:, :3] * 255).astype(np.uint8)
-
-    for i in range(n_layers):
-        mask = stacked_masks[:, :, i]
-        mask = mask[:, :, np.newaxis]
-        colored_stack += (mask * colors[i])
-
-    return colored_stack
 
 
 def time(path):

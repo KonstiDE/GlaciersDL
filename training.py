@@ -233,7 +233,7 @@ def start():
     if ray_tune:
         config_space = {
             "lr": tune.loguniform(1e-6, 1e-3),
-            "batch_size": tune.choice([4, 8, 16])
+            "batch_size": tune.choice([16])
         }
         result = tune.run(
             partial(run),
@@ -248,9 +248,6 @@ def start():
         print(f"Best trial config: {best_trial.config}")
         print(f"Best trial final validation loss: {best_trial.last_result['validation_loss']}")
         print(f"Best trial final validation buffered accuracy: {best_trial.last_result['validation_bacc']}")
-
-        best_checkpoint = best_trial.checkpoint.to_air_checkpoint()
-        best_checkpoint_data = best_checkpoint.to_dict()
     else:
         run({})
 
