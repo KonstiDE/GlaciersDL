@@ -7,4 +7,4 @@ batch_size = 16
 num_workers = 2
 pin_memory = True
 threshold = 0.5
-lr = 2e-04
+lr = 1e-04

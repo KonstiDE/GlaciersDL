@@ -16,11 +16,11 @@ class DoubleConv(nn.Module):
         super(DoubleConv, self).__init__()
 
         self.double_conv = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=(3, 3), bias=False, padding=1, padding_mode='replicate'),
+            nn.Conv2d(in_channels, out_channels, kernel_size=(5, 5), bias=False, padding=6, padding_mode='replicate', dilation=3),
             nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(inplace=True),
 
-            nn.Conv2d(out_channels, out_channels, kernel_size=(3, 3), bias=False, padding=1, padding_mode='replicate'),
+            nn.Conv2d(out_channels, out_channels, kernel_size=(5, 5), bias=False, padding=6, padding_mode='replicate', dilation=3),
             nn.BatchNorm2d(out_channels),
             nn.LeakyReLU(inplace=True),
         )

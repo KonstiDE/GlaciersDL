@@ -5,13 +5,17 @@ from model.unet_layers import (
     DoubleConv, UpConv
 )
 
+from model.unet_aspp import (
+    ASPP
+)
+
 
 class GlacierUNET(nn.Module):
     def __init__(self, in_channels=1, out_channels=1, features=None):
         super(GlacierUNET, self).__init__()
 
         if features is None:
-            features = [in_channels, 64, 128, 256, 512, 1024]
+            features = [in_channels, 32, 64, 128, 256]
 
         self.down_convs = nn.ModuleList()
         self.up_convs = nn.ModuleList()
@@ -23,7 +27,7 @@ class GlacierUNET(nn.Module):
         for i in range(len(features) - 2):
             self.down_convs.append(DoubleConv(features[i], features[i + 1]))
 
-        self.bottleneck = DoubleConv(features[-2], features[-1])
+        self.bottleneck = ASPP(in_channels=features[-2], out_channels=features[-1], atrous_rates=[1, 2, 4, 8, 16])
 
         features = features[::-1]
 
@@ -55,7 +59,12 @@ class GlacierUNET(nn.Module):
 def test():
     unet = GlacierUNET(in_channels=1, out_channels=1).cuda()
 
-    x = torch.randn(1, 1, 512, 512).cuda()
+    x = torch.randn(1, 1, 256, 256)
+
+    l = torch.nn.Conv2d(in_channels=1, out_channels=1, kernel_size=(5, 5), padding=6, dilation=3)
+    print(l(x).shape)
+
+    exit(99)
 
     out = unet(x)
 

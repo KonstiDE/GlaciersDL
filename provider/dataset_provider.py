@@ -44,7 +44,7 @@ class NrwDataSet(Dataset):
             data = rio.open(path_tuple[0]).read().squeeze(0)
             mask = rio.open(path_tuple[1]).read().squeeze(0)
             mask[mask == 255] = 1
-            mask = thicken_front(mask, thickness=5)
+            mask = thicken_front(mask, thickness=10)
 
             transformed = transform(image=data, mask=mask)
 
