@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 
 
+# Thicken a line via the cv2 package
 def thicken_front(mask, thickness=5):
     kernel = np.ones((thickness, thickness), np.uint8)
 

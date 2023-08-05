@@ -2,6 +2,8 @@ import numpy as np
 import torch
 
 
+# This is an Object used for early stopping. I use this all the time, credits go to the package pytorchtools from where
+# we copied it / edit it if needed for some projects.
 class EarlyStopping:
     def __init__(self, patience=7, verbose=False, delta=0, path='checkpoint_bigAdam.pt', trace_func=print):
         self.patience = patience
