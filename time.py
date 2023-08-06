@@ -12,6 +12,7 @@ from config.configuration import (
     base_path
 )
 
+from provider.front_provider import thicken_front
 
 def time(path):
     files = sorted(os.listdir(os.path.join(base_path, path)))
@@ -26,7 +27,7 @@ def time(path):
                 path,
                 file
             )).read().squeeze(0)
-
+            pred = thicken_front(pred, thickness=2)
             pred[pred == 1] = index + 1
 
             stack.append(pred)

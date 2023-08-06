@@ -17,8 +17,6 @@ def load_graphs_from_checkpoint(model_path, epoch):
         overall_validation_loss = checkpoint['validation_losses']
         overall_training_bacc = checkpoint['training_baccs']
         overall_validation_bacc = checkpoint['validation_baccs']
-        overall_training_f1 = checkpoint['training_f1s']
-        overall_validation_f1 = checkpoint['validation_f1s']
 
         plt.figure()
         plt.plot(overall_training_loss, 'b', label="Training loss")
@@ -28,15 +26,8 @@ def load_graphs_from_checkpoint(model_path, epoch):
         plt.show()
 
         plt.figure()
-        plt.plot(overall_training_bacc, 'b', label="Training binary accuracy")
-        plt.plot(overall_validation_bacc, 'o', label="Validation binary accuracy")
-        plt.legend(loc="lower right", fontsize=18)
-        plt.tick_params(labelsize=18)
-        plt.show()
-
-        plt.figure()
-        plt.plot(overall_training_f1, 'b', label="Training F1 score")
-        plt.plot(overall_validation_f1, 'o', label="Validation F1 score")
+        plt.plot(overall_training_bacc, 'b', label="Training bbox accuracy")
+        plt.plot(overall_validation_bacc, 'r', label="Validation bbox accuracy")
         plt.legend(loc="lower right", fontsize=18)
         plt.tick_params(labelsize=18)
         plt.show()
@@ -51,5 +42,5 @@ def load_graphs_from_checkpoint(model_path, epoch):
 if __name__ == '__main__':
     load_graphs_from_checkpoint(os.path.join(
         base_path,
-        "results_BCEWithLogitsLoss_Adam_GlacierUNET_5e-06/"
-    ), 9)
+        "results_DiceLoss_Adam_GlacierUNET_3x3_dil1_ASPPconv_max512/"
+    ), 11)

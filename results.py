@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
     glacier_state_dict = torch.load(os.path.join(
         base_path,
-        "results_DiceLoss_Adam_GlacierUNET/model_epoch6.pt"
+        "results_DiceLoss_Adam_GlacierUNET_3x3_dil1_ASPPconv_max512/model_epoch6.pt"
     ))["model_state_dict"]
     glacier_model.load_state_dict(glacier_state_dict)
 
