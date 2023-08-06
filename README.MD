@@ -70,7 +70,7 @@ box accuracy in the following figure:
 For the visual results, we created a time series on the Crane Glacier located in Antarctica. Here, we want to stress, 
 that our model converges very strongly, as we only trained and validated on completely other glaciers and not included
 this particular form of front in our training / validation data. From the following figure, we can conclude not some 
-movement in the glacier ice to stone edges (a and b), but a clear directional development on the glacier ice to water front.
+movement in the glacier ice to stone edges (b), but a clear directional development on the glacier ice to water front (a, c).
 The picture was made our of 18 observations from June 2011 to November 2012.
 \
 \
