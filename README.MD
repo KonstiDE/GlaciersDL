@@ -61,7 +61,9 @@ Overall, our model shows solid performance. However, metrics fluctuate heavy in 
 for numerical results, wee achieve a bounding box accuracy of roughly 70%. We present our loss curve and the bounding 
 box accuracy in the following figure:
 \
+\
 ![Metrics](qgis/metrics.png)
+\
 \
 For the visual results, we created a time series on the Crane Glacier located in Antarctica. Here, we want to stress, 
 that our model converges very strongly, as we only trained and validated on completely other glaciers and not included
@@ -69,7 +71,9 @@ this particular form of front in our training / validation data. From the follow
 movement in the glacier ice to stone edges (a and b), but a clear directional development on the glacier ice to water front.
 The picture was made our of 18 observations from June 2011 to November 2012.
 \
+\
 ![Visuals](qgis/map_result.png)
+\
 \
 Greetings,
 
