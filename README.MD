@@ -41,7 +41,9 @@ depth in contrast to the original model by **Ronneberger et al. (2017)**. Second
 ***Atrous Spatial Pyramid Pooling*** module proposed by **Chen et al.** in 2016, which help conver more global context
 in deeper feature spaces. The architecture reads as presented in the following figure: 
 \
+\
 ![Architecture of ASPP infused U-Net](qgis/architecture.png)
+\
 \
 We train this architecture on a 20GB partition of one 80GB NVIDIA A100 GPU cluster setup. Within our implementation,
 we go with an Adam optimizer, Dice-Score as a loss function and a batch size of 16. The learning rate we chose for a
