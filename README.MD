@@ -1,4 +1,4 @@
-# 1. Introduction: Glacier Deep Learning
+## 1. Introduction: Glacier Deep Learning
 
 Welcome to the GlacierDL Git of the [EAGLE](https://eagle-science.org/) course **Advanced Programming for Remote Sensing
 and GIS (04-GEO-MET4)**. Here, we reimplemented a neural network in [PyTorch](https://pytorch.org/) capable of learning
@@ -70,6 +70,10 @@ movement in the glacier ice to stone edges (a and b), but a clear directional de
 The picture was made our of 18 observations from June 2011 to November 2012.
 \
 ![Visuals](qgis/map_result.png)
+\
+Greetings,
+
+[Sarah Leibrock](https://github.com/leibrocs) and [Konstantin "Caipi" Müller](https://konstide.github.io/)
 
 
 ## References
