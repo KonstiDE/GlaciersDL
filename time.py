@@ -14,12 +14,16 @@ from config.configuration import (
 
 from provider.front_provider import thicken_front
 
+
+# In the "time" method we get multiple images from a predicted time series and merge them together into one. We assign
+# an incremental value to the pixels from different time steps to later on visualize the movement in QGIS.
 def time(path):
     files = sorted(os.listdir(os.path.join(base_path, path)))
 
     stack = []
     underlying = None
 
+    # For every prediction, we thicken the front a little (better visuals in QGIS) and stack them on top
     for index, (file) in enumerate(files):
         if file.__contains__("_pred.png"):
             pred = rio.open(os.path.join(
@@ -38,12 +42,16 @@ def time(path):
                 file
             )).read().squeeze(0)
 
+    # Now reducing the channel-size (equal to the size of the time series) to one again via argmax
+    # (the last movement on top)
     stack = np.stack(stack, axis=-1)
     stack = np.argmax(stack, axis=-1)
 
     print(np.unique(stack))
     print(stack.shape)
 
+    # Writing out new rasters is a bit tricky in python, sorry we do it manually here. "lines" is our with argmax
+    # processed stack, "base_layer" is a SAR scene we use as a base layer to help better image the movement
     transform = from_origin(472137, 5015782, 0.5, 0.5)
 
     lines = rio.open('results.tif', 'w', driver='GTiff',

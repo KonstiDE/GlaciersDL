@@ -10,6 +10,8 @@ from config.configuration import (
 )
 
 
+# With this method we extract the saved metrics from our .pt file format and generate easy receptable graphs for an
+# arbitrary epoch
 def load_graphs_from_checkpoint(model_path, epoch):
     if os.path.isfile(os.path.join(model_path, "model_epoch" + str(epoch) + ".pt")):
         checkpoint = torch.load(model_path + "model_epoch" + str(epoch) + ".pt", map_location='cpu')
