@@ -38,7 +38,7 @@ available (e.g. radar shadow and layover areas, areas outside the swath) (Herrma
 
 For detecting the calving fronts we employ a manipulated Unet architecture. First, we half the image channels in each
 depth in contrast to the original model by **Ronneberger et al. (2017)**. Secondly, the bottleneck is extended with an
-***Atrous Spatial Pyramid Pooling*** module proposed by **Chen et al.** in 2016, which help conver more global context
+***Atrous Spatial Pyramid Pooling*** module proposed by **Chen et al.** in 2016, which help cover more global context
 in deeper feature spaces. The architecture reads as presented in the following figure: 
 \
 \
